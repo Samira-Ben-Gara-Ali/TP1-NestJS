@@ -1,54 +1,82 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { GenericCrud } from '../common/db/generic-crud.service';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  FindOptionsWhere,
+  Repository,
+} from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, QueryDeepPartialEntity, Repository, UpdateResult } from 'typeorm';
+import { GenericCrud } from '../common/db/generic-crud.service';
 import { CvEntity } from './entities/cv.entity';
+import { UserEntity } from '../users/entities/user.entity';
+import { UpdateCvDto } from './dto/update-cv.dto';
+import { UserRoleEnum } from '../users/enums/user-role.enum';
+
 @Injectable()
 export class CvsService extends GenericCrud<CvEntity> {
   constructor(
     @InjectRepository(CvEntity)
-    cvRepository: Repository<CvEntity>,
+    private readonly cvRepository: Repository<CvEntity>,
   ) {
     super(cvRepository);
   }
-  private async validateUniqueFields(
-    fields: Partial<CvEntity>,
-    excludeId?: number,
-  ): Promise<void> {
-    const checks: (keyof CvEntity)[] = ['cin'];
 
-    for (const field of checks) {
-      const value = fields[field];
+  private async validateUniqueCin(cin: number, excludeId?: number) {
+    const exists = await this.cvRepository.findOne({
+      where: { cin },
+    });
 
-      if (value !== undefined && value !== null) {
-        const exists = await this.repository.findOne({
-          where: { [field]: value },
-        });
-
-        if (exists && exists.id !== excludeId) {
-          throw new BadRequestException(`${field} already exists`);
-        }
-      }
+    if (exists && exists.id !== excludeId) {
+      throw new BadRequestException('CIN already exists');
     }
   }
-  async create(dto: Partial<CvEntity>): Promise<CvEntity> {
-    await this.validateUniqueFields(dto);
-    return super.create(dto);
+  async findMyCvs(user: UserEntity): Promise<CvEntity[]> {
+    return this.cvRepository.find({
+      where: { user: { id: user.id } },
+      relations: ['skills'],
+    });
   }
-  async update(id: number, dto: Partial<CvEntity>): Promise<CvEntity> {
-    await this.validateUniqueFields(dto, id);
+
+  async findOneWithUser(id: number): Promise<CvEntity> {
+    const cv = await this.cvRepository.findOne({
+      where: { id },
+      relations: ['user', 'skills'],
+    });
+
+    if (!cv) {
+      throw new NotFoundException('CV not found');
+    }
+
+    return cv;
+  }
+
+  async createCv(
+    dto: Partial<CvEntity>,
+    user: UserEntity,
+  ): Promise<CvEntity> {
+    await this.validateUniqueCin(dto.cin!);
+
+    return super.create({
+      ...dto,
+      user,
+    });
+  }
+
+  async updateCv(
+    id: number,
+    dto: UpdateCvDto,
+  ): Promise<CvEntity> {
+    if (dto.cin) {
+      await this.validateUniqueCin(dto.cin, id);
+    }
+
     return super.update(id, dto);
-  }
-  async updateByCriteria(
-    criteria: FindOptionsWhere<CvEntity>,
-    dto: QueryDeepPartialEntity<CvEntity>,
-  ): Promise<UpdateResult> {
-    await this.validateUniqueFields(dto as Partial<CvEntity>);
-    return super.updateByCriteria(criteria, dto);
   }
 
   async statCvNumberByAge(min?: number, max?: number) {
-    const qb = this.repository.createQueryBuilder('cv');
+    const qb = this.cvRepository.createQueryBuilder('cv');
 
     qb
       .select('cv.age', 'age')
@@ -66,4 +94,47 @@ export class CvsService extends GenericCrud<CvEntity> {
 
     return qb.getRawMany();
   }
+
+  async updateByCriteriaCv(
+    criteria: FindOptionsWhere<CvEntity>,
+    dto: UpdateCvDto,
+    user: UserEntity,
+  ): Promise<CvEntity[]> {
+
+    let where: FindOptionsWhere<CvEntity>;
+
+    if (user.role === UserRoleEnum.ADMIN) {
+      where = criteria;
+    } else {
+      where = {
+        ...criteria,
+        user: {
+          id: user.id,
+        },
+      };
+    }
+
+    const cvs = await this.cvRepository.find({
+      where,
+      relations: ['user'],
+    });
+
+    if (!cvs.length) {
+      throw new NotFoundException('No CV found or not allowed');
+    }
+
+    const updated: CvEntity[] = [];
+
+    for (const cv of cvs) {
+      if (dto.cin) {
+        await this.validateUniqueCin(dto.cin, cv.id);
+      }
+
+      const entity = this.cvRepository.merge(cv, dto);
+      updated.push(await this.cvRepository.save(entity));
+    }
+
+    return updated;
+  }
+
 }

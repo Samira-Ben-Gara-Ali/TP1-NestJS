@@ -5,7 +5,6 @@ import {
   Repository,
   UpdateResult,
 } from 'typeorm';
-import { qbDateInterval } from './helpers';
 
 @Injectable()
 export class GenericCrud<Entity extends { id: number }> {

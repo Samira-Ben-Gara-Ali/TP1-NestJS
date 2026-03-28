@@ -5,6 +5,7 @@ import {
 } from 'typeorm';
 import { TimeStampEntity } from '../../common/db/timestamp.entity';
 import { CvEntity } from '../../cvs/entities/cv.entity';
+import { UserRoleEnum } from '../enums/user-role.enum';
 
 @Entity('user')
 export class UserEntity extends TimeStampEntity {
@@ -20,7 +21,9 @@ export class UserEntity extends TimeStampEntity {
     unique: true,
   })
   email: string;
-  @Column()
+  @Column({
+    select :false
+  })
   password: string;
   //pour chaque cv va chercher l'user associee
   @OneToMany(() => CvEntity, (cv) => cv.user, {
@@ -28,4 +31,11 @@ export class UserEntity extends TimeStampEntity {
     eager: false
   })
   cvs: CvEntity[];
+
+  @Column({
+    type: 'enum',
+    enum: UserRoleEnum,
+    default: UserRoleEnum.USER
+  })
+  role: UserRoleEnum;
 }

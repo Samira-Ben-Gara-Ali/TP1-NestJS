@@ -1,9 +1,13 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { FindOptionsWhere, QueryDeepPartialEntity, Repository, UpdateResult } from 'typeorm';
+import { BadRequestException,  Injectable } from '@nestjs/common';
+import {
+  FindOptionsWhere,
+  Repository,
+  UpdateResult,
+} from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { GenericCrud } from '../common/db/generic-crud.service';
 import { UserEntity } from './entities/user.entity';
-import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService extends GenericCrud<UserEntity> {
@@ -13,7 +17,8 @@ export class UsersService extends GenericCrud<UserEntity> {
   ) {
     super(userRepository);
   }
-  private async validateUniqueFields(
+
+  public async validateUniqueFields(
     fields: Partial<UserEntity>,
     excludeId?: number,
   ): Promise<void> {
@@ -31,19 +36,35 @@ export class UsersService extends GenericCrud<UserEntity> {
       }
     }
   }
-  async create(dto: CreateUserDto): Promise<UserEntity> {
-    await this.validateUniqueFields(dto);
-    return super.create(dto);
-  }
-  async update(id: number, dto: Partial<UserEntity>): Promise<UserEntity> {
+
+  async updateUser(
+    id: number,
+    dto: UpdateUserDto,
+  ): Promise<UserEntity> {
     await this.validateUniqueFields(dto, id);
     return super.update(id, dto);
   }
+
   async updateByCriteria(
     criteria: FindOptionsWhere<UserEntity>,
-    dto: QueryDeepPartialEntity<UserEntity>,
+    dto: UpdateUserDto,
   ): Promise<UpdateResult> {
     await this.validateUniqueFields(dto as Partial<UserEntity>);
     return super.updateByCriteria(criteria, dto);
   }
+
+  async getUserByIdentifier(
+    identifier: string,
+    withPassword = false,
+  ) {
+    const qb = this.repository
+      .createQueryBuilder('user')
+      .where('user.username = :identifier', { identifier })
+      .orWhere('user.email = :identifier', { identifier });
+    if (withPassword) {
+      qb.addSelect(['user.password']);
+    }
+    return qb.getOne();
+  }
+
 }
