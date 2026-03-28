@@ -11,6 +11,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { GenericCrud } from '../common/db/generic-crud.service';
 import { CvEntity } from './entities/cv.entity';
 import { UpdateCvDto } from './dto/update-cv.dto';
+import { UserEntity } from '../users/entities/user.entity';
+import { CreateCvDto } from './dto/create-cv.dto';
 
 @Injectable()
 export class CvsService extends GenericCrud<CvEntity> {
@@ -31,14 +33,12 @@ export class CvsService extends GenericCrud<CvEntity> {
     }
   }
 
-
-  async createCv(
-    dto: Partial<CvEntity>,
-  ): Promise<CvEntity> {
-    await this.validateUniqueCin(dto.cin!);
+  async createCv(dto: CreateCvDto, user: UserEntity): Promise<CvEntity> {
+    await this.validateUniqueCin(dto.cin);
 
     return super.create({
       ...dto,
+      user,
     });
   }
 
@@ -98,5 +98,23 @@ export class CvsService extends GenericCrud<CvEntity> {
 
     return updated;
   }
+  async findMyCvs(userId: number) {
+    return this.cvRepository.find({
+      where: { user: { id: userId } },
+      relations: ['user'],
+    });
+  }
+  async findOneWithUser(id: number): Promise<CvEntity> {
+    const cv = await this.cvRepository.findOne({
+      where: { id },
+      relations: ['user'],
+      withDeleted: true,
+    });
 
+    if (!cv) {
+      throw new NotFoundException('CV not found');
+    }
+
+    return cv;
+  }
 }

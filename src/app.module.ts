@@ -3,7 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/users.module';
-import { CvsModule } from './cvs/cvs.module';
+import { CvModule } from './cvs/cvs.module';
 import { SkillsModule } from './skills/skills.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
@@ -28,7 +28,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     }),
 
     UsersModule,
-    CvsModule,
+    CvModule,
     SkillsModule,
   ],
   controllers: [AppController],
