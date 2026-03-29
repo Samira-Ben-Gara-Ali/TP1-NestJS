@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
   Delete,
-  ForbiddenException,
+  ForbiddenException, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { CvsService } from './cvs.service';
 import { CvEntity } from './entities/cv.entity';
@@ -20,12 +20,13 @@ import { StatParamDto } from './dto/stat-param-cv.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { UserEntity } from '../users/entities/user.entity';
 import { CurrentUser } from '../decorators/current-user.decorator';
-import { FindOptionsWhere } from 'typeorm';
 import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../decorators/role.decorator';
 import { UserRoleEnum } from '../users/enums/user-role.enum';
 import { UpdateByCriteriaCvDto } from './dto/update-by-criteria-cv.dto';
-
+import { FileInterceptor } from '@nestjs/platform-express';
+import { editFileName, imageFileFilter } from '../common/file-upload.utils';
+import { diskStorage } from 'multer';
 @Controller('cvs')
 export class CvsController extends GenericController<CvEntity> {
   constructor(private readonly cvsService: CvsService) {
@@ -67,26 +68,60 @@ export class CvsController extends GenericController<CvEntity> {
 
   @UseGuards(JwtAuthGuard)
   @Post()
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: editFileName,
+      }),
+      fileFilter: imageFileFilter,
+    }),
+  )
   create(
     @Body() dto: CreateCvDto,
+    @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: UserEntity,
   ) {
+    if (file) {
+      dto.path = file.filename;
+    }
+
     return this.cvsService.createCv(dto, user);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: editFileName,
+      }),
+      fileFilter: imageFileFilter,
+    }),
+  )
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCvDto,
+    @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: UserEntity,
   ): Promise<CvEntity> {
     const cv = await this.cvsService.findOneWithUser(id);
-    if (user.role === UserRoleEnum.ADMIN || cv.user.id === user.id) {
+
+    if (
+      user.role === UserRoleEnum.ADMIN ||
+      cv.user.id === user.id
+    ) {
+      if (file) {
+        dto.path = file.filename;
+      }
+
       return this.cvsService.updateCv(id, dto);
     }
+
     throw new ForbiddenException('You can only modify your own cvs');
   }
+
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
