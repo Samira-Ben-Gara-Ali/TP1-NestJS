@@ -7,17 +7,17 @@ import { Roles } from '../../decorators/role.decorator';
 import { DateFilterDto } from './date-filter.dto';
 
 
-export class GenericController<
-  Entity extends { id: number },
-> {
+export class GenericController<Entity extends { id: number }> {
   constructor(protected service: GenericCrud<Entity>) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRoleEnum.ADMIN)
   @Get('filter/date')
-  findByDate(@Query() query: DateFilterDto): Promise<Entity[]> {
+  findByDate(
+    @Query() query: DateFilterDto,
+  ): Promise<Entity[]> {
     return this.service.findWithDateInterval(
-      'createdAt' as keyof Entity,
+      query.key as keyof Entity,
       query.minDate,
       query.maxDate,
     );
