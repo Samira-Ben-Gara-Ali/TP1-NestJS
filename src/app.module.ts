@@ -10,6 +10,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { EventsModule } from './events/events.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { AudioMessagingGateway } from './audio-messaging/audio-messaging.gateway';
 
 @Module({
   imports: [
@@ -42,6 +43,6 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     WebhooksModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, AudioMessagingGateway],
 })
 export class AppModule {}
