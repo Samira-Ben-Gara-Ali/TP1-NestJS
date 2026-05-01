@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
+
 import { io } from 'socket.io-client';
 
-const socket = io('http://10.172.71.70:3000');
+// IMPORTANT: no URL needed (same origin)
+export const socket = io({
+  path: '/socket.io',
+  transports: ['websocket', 'polling'],
+  withCredentials: true,
+});
 
 const MAX_LATENCY = 0.3;
 const SAMPLE_RATE = 44100;
