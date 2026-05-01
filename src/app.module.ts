@@ -7,17 +7,23 @@ import { CvsModule } from './cvs/cvs.module';
 import { SkillsModule } from './skills/skills.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { EventsModule } from './events/events.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    EventEmitterModule.forRoot({
+      wildcard: true,
+    }),
 
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        type: 'mysql',
+        type: 'postgres',
         host: configService.getOrThrow<string>('DB_HOST'),
         port: parseInt(configService.getOrThrow<string>('DB_PORT')),
         username: configService.getOrThrow<string>('DB_USER'),
@@ -32,6 +38,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     CvsModule,
     SkillsModule,
     AuthModule,
+    EventsModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

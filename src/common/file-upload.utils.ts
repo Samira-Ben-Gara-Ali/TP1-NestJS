@@ -18,8 +18,8 @@ export const imageFileFilter = (
   file: Express.Multer.File,
   callback: (error: Error | null, acceptFile: boolean) => void,
 ): void => {
-  if (!/\.(jpg|jpeg|png|gif)$/.test(file.originalname)) {
-    return callback(new Error('Only image files are allowed!'), false);
+  if (!/\.(pdf)$/.test(file.originalname)) {
+    return callback(new Error('Only pdf files are allowed!'), false);
   }
 
   callback(null, true);

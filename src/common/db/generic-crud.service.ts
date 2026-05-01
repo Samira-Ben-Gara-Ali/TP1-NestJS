@@ -8,7 +8,9 @@ import {
 
 @Injectable()
 export class GenericCrud<Entity extends { id: number }> {
-  constructor(protected repository: Repository<Entity>) {}
+  constructor(
+    protected repository: Repository<Entity>,
+  ) {}
   private getEntityName(): string {
     return this.repository.metadata.name.replace('Entity', '');
   }
@@ -23,32 +25,40 @@ export class GenericCrud<Entity extends { id: number }> {
   async softDelete(id: number): Promise<UpdateResult> {
     const result = await this.repository.softDelete(id);
     if (!result.affected) {
-      throw new NotFoundException(`${this.getEntityName()} with id ${id} not found`);
+      throw new NotFoundException(
+        `${this.getEntityName()} with id ${id} not found`,
+      );
     }
     return result;
   }
   async delete(id: number): Promise<DeleteResult> {
     const result = await this.repository.delete(id);
     if (!result.affected) {
-      throw new NotFoundException(`${this.getEntityName()} with id ${id} not found`);
+      throw new NotFoundException(
+        `${this.getEntityName()} with id ${id} not found`,
+      );
     }
     return result;
   }
   async restore(id: number): Promise<UpdateResult> {
     const result = await this.repository.restore(id);
     if (!result.affected) {
-      throw new NotFoundException(`${this.getEntityName()} with id ${id} not found`);
+      throw new NotFoundException(
+        `${this.getEntityName()} with id ${id} not found`,
+      );
     }
     return result;
   }
-  async update(id: number, dto:any): Promise<Entity> {
+  async update(id: number, dto: any): Promise<Entity> {
     const entity = await this.repository.preload({
       ...dto,
       id,
     });
 
     if (!entity) {
-      throw new NotFoundException(`${this.getEntityName()} with id ${id} not found`);
+      throw new NotFoundException(
+        `${this.getEntityName()} with id ${id} not found`,
+      );
     }
 
     return this.repository.save(entity);

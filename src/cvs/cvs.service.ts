@@ -13,12 +13,16 @@ import { CvEntity } from './entities/cv.entity';
 import { UserEntity } from '../users/entities/user.entity';
 import { UpdateCvDto } from './dto/update-cv.dto';
 import { UserRoleEnum } from '../users/enums/user-role.enum';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventType } from '../events/entities/eventType.enum';
+import { CvEventPayload } from './entities/cvEventPayload.interface';
 
 @Injectable()
 export class CvsService extends GenericCrud<CvEntity> {
   constructor(
     @InjectRepository(CvEntity)
     private readonly cvRepository: Repository<CvEntity>,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     super(cvRepository);
   }
@@ -51,36 +55,71 @@ export class CvsService extends GenericCrud<CvEntity> {
 
     return cv;
   }
-
-  async createCv(
-    dto: Partial<CvEntity>,
-    user: UserEntity,
-  ): Promise<CvEntity> {
+  private emitCvEvent(
+    type: EventType,
+    cvId: number,
+    path: string,
+    userId?: number,
+  ) {
+    const payload: CvEventPayload = {
+      entity: 'cv',
+      entityId: cvId,
+      type,
+      userId,
+      path: path,
+    };
+    this.eventEmitter.emit(`cv.${type.toLowerCase()}`, payload);
+  }
+  async createCv(dto: Partial<CvEntity>, user: UserEntity): Promise<CvEntity> {
     await this.validateUniqueCin(dto.cin!);
 
-    return super.create({
+    const cv = await super.create({
       ...dto,
       user,
     });
+    this.emitCvEvent(EventType.CREATED, cv.id, cv.path, user.id);
+
+    return cv;
   }
 
   async updateCv(
     id: number,
     dto: UpdateCvDto,
+    user: UserEntity,
   ): Promise<CvEntity> {
     if (dto.cin) {
       await this.validateUniqueCin(dto.cin, id);
     }
 
-    return super.update(id, dto);
-  }
+    const updated = await super.update(id, dto);
 
+    this.emitCvEvent(EventType.UPDATED, id, updated.path, user.id);
+
+    return updated;
+  }
+  /*async deleteCv(id: number, user: UserEntity) {
+    const result = await this.softDelete(id);
+
+    this.emitCvEvent(EventType.DELETED, id, user.id, result.path);
+
+    return result;
+  }*/
+
+  async updateCvStatus(
+    id: number,
+    data: {
+      status: 'PENDING' | 'VALID' | 'REJECTED';
+      aiReason: string;
+      aiScore: number;
+    },
+  ): Promise<void> {
+    await this.cvRepository.update(id, data);
+
+  }
   async statCvNumberByAge(min?: number, max?: number) {
     const qb = this.cvRepository.createQueryBuilder('cv');
 
-    qb
-      .select('cv.age', 'age')
-      .addSelect('COUNT(cv.id)', 'count');
+    qb.select('cv.age', 'age').addSelect('COUNT(cv.id)', 'count');
 
     if (min !== undefined) {
       qb.andWhere('cv.age >= :min', { min });
@@ -100,7 +139,6 @@ export class CvsService extends GenericCrud<CvEntity> {
     dto: UpdateCvDto,
     user: UserEntity,
   ): Promise<CvEntity[]> {
-
     let where: FindOptionsWhere<CvEntity>;
 
     if (user.role === UserRoleEnum.ADMIN) {
@@ -136,5 +174,4 @@ export class CvsService extends GenericCrud<CvEntity> {
 
     return updated;
   }
-
 }

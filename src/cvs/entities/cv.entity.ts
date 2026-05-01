@@ -11,7 +11,14 @@ export class CvEntity extends TimeStampEntity {
     length: 50,
   })
   name: string;
+  @Column({ default: 'PENDING' })
+  status: 'PENDING' | 'VALID' | 'REJECTED';
 
+  @Column({ nullable: true })
+  aiReason: string;
+
+  @Column({ nullable: true })
+  aiScore: number;
   @Column({
     length: 50,
   })
@@ -29,12 +36,12 @@ export class CvEntity extends TimeStampEntity {
   //pour chaque user va chercher les cvs correspondants
   @ManyToOne(() => UserEntity, (user) => user.cvs, {
     nullable: false,
-    onDelete: 'CASCADE'
+    onDelete: 'CASCADE',
   })
   user: UserEntity;
   @ManyToMany(() => SkillEntity, (skill) => skill.cvs, {
     eager: false,
-    cascade: false
+    cascade: false,
   })
   @JoinTable({
     name: 'cv_skills',

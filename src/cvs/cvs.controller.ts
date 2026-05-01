@@ -9,7 +9,10 @@ import {
   Query,
   UseGuards,
   Delete,
-  ForbiddenException, UploadedFile, UseInterceptors,
+  ForbiddenException,
+  UploadedFile,
+  UseInterceptors,
+  Sse,
 } from '@nestjs/common';
 import { CvsService } from './cvs.service';
 import { CvEntity } from './entities/cv.entity';
@@ -27,12 +30,35 @@ import { UpdateByCriteriaCvDto } from './dto/update-by-criteria-cv.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { editFileName, imageFileFilter } from '../common/file-upload.utils';
 import { diskStorage } from 'multer';
+import { filter, fromEvent, map, Observable } from 'rxjs';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CvEventPayload } from './entities/cvEventPayload.interface';
+import { MessageEvent} from '@nestjs/common';
 @Controller('cvs')
 export class CvsController extends GenericController<CvEntity> {
-  constructor(private readonly cvsService: CvsService) {
+  constructor(
+    private readonly cvsService: CvsService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {
     super(cvsService);
   }
-
+  @UseGuards(JwtAuthGuard)
+  @Sse('stream')
+  sse(@CurrentUser() user: UserEntity): Observable<MessageEvent> {
+    // fromEvent va recuperer le payload emis par la methode emit
+    return fromEvent(this.eventEmitter, 'cv.*').pipe(
+      filter((payload: CvEventPayload) => {
+        // admin peut tout voir, l user qui demande d etre notifiee doit etre le meme
+        // qui a declencher l evenement, sauvegardee dans le payload
+        return user.role === UserRoleEnum.ADMIN || payload.userId === user.id;
+      }),
+      map(
+        (payload: CvEventPayload): MessageEvent => ({
+          data: payload,
+        }),
+      ),
+    );
+  }
   @UseGuards(JwtAuthGuard)
   @Get()
   findAll(@CurrentUser() user: UserEntity) {
@@ -46,10 +72,7 @@ export class CvsController extends GenericController<CvEntity> {
   @Roles(UserRoleEnum.ADMIN)
   @Get('stats')
   statsCvNumberByAge(@Query() query: StatParamDto) {
-    return this.cvsService.statCvNumberByAge(
-      query.min,
-      query.max,
-    );
+    return this.cvsService.statCvNumberByAge(query.min, query.max);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -108,22 +131,18 @@ export class CvsController extends GenericController<CvEntity> {
   ): Promise<CvEntity> {
     const cv = await this.cvsService.findOneWithUser(id);
 
-    if (
-      user.role === UserRoleEnum.ADMIN ||
-      cv.user.id === user.id
-    ) {
+    if (user.role === UserRoleEnum.ADMIN || cv.user.id === user.id) {
       if (file) {
         dto.path = file.filename;
       }
 
-      return this.cvsService.updateCv(id, dto);
+      return this.cvsService.updateCv(id, dto, user);
     }
 
     throw new ForbiddenException('You can only modify your own cvs');
   }
 
-
-  @UseGuards(JwtAuthGuard)
+  /*@UseGuards(JwtAuthGuard)
   @Delete(':id')
   async delete(
     @Param('id', ParseIntPipe) id: number,
@@ -131,10 +150,10 @@ export class CvsController extends GenericController<CvEntity> {
   ) {
     const cv = await this.cvsService.findOneWithUser(id);
     if (user.role === UserRoleEnum.ADMIN || cv.user.id === user.id) {
-      return this.cvsService.softDelete(id);
+      return this.cvsService.deleteCv(id, user);
     }
     throw new ForbiddenException('You can only delete your own cvs');
-  }
+  }*/
 
   @UseGuards(JwtAuthGuard)
   @Patch()
@@ -142,11 +161,7 @@ export class CvsController extends GenericController<CvEntity> {
     @Body() body: UpdateByCriteriaCvDto,
     @CurrentUser() user: UserEntity,
   ) {
-    return this.cvsService.updateByCriteriaCv(
-      body.criteria,
-      body.dto,
-      user,
-    );
+    return this.cvsService.updateByCriteriaCv(body.criteria, body.dto, user);
   }
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRoleEnum.ADMIN)
