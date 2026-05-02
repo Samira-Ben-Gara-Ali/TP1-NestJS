@@ -26,13 +26,13 @@ async function extractTextFromPdf(filePath) {
     pdfParser.loadPDF(filePath);
   });
 }
-// Analyse le CV
+
 const Groq = require('groq-sdk');
 
 const client = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
-
+// Analyse le CV
 async function analyzeCvWithAI(filePath) {
   const absolutePath = path.join(__dirname, '../../uploads', filePath);
 
@@ -41,10 +41,9 @@ async function analyzeCvWithAI(filePath) {
   }
 
   const cvText = await extractTextFromPdf(absolutePath);
-  console.log('📝 Texte extrait:', cvText.substring(0, 100));
 
   const response = await client.chat.completions.create({
-    model: 'llama-3.3-70b-versatile', // ✅ gratuit et très puissant
+    model: 'llama-3.3-70b-versatile',
     messages: [
       {
         role: 'user',
@@ -72,19 +71,17 @@ ${cvText}`,
   return JSON.parse(clean);
 }
 
-// Endpoint appelé par NestJS
+// nestjs va appeler sur cet endpoint
 app.post('/analyze', async (req, res) => {
   const { cvId, filePath } = req.body;
-  console.log(`📄 CV reçu : cvId=${cvId}, file=${filePath}`);
+  console.log(`CV reçu : cvId=${cvId}, file=${filePath}`);
 
-  // Répondre immédiatement
   res.sendStatus(200);
 
   try {
-    // Analyse IA réelle
-    console.log(`🤖 Analyse en cours...`);
+    console.log(`Analyse en cours...`);
     const result = await analyzeCvWithAI(filePath);
-    console.log(`✅ Résultat IA :`, result);
+    console.log(`Résultat IA :`, result);
 
     // Rappeler NestJS avec le résultat
     await axios.post(
@@ -100,11 +97,11 @@ app.post('/analyze', async (req, res) => {
       },
     );
 
-    console.log(`🔔 Webhook envoyé : cvId=${cvId}, isValid=${result.isValid}`);
+    console.log(`Webhook envoyé : cvId=${cvId}, isValid=${result.isValid}`);
   } catch (err) {
-    console.error(`❌ Erreur analyse :`, err);
+    console.error(`Erreur analyse :`, err);
 
-    // En cas d'erreur, notifier NestJS quand même
+    // en cas d erreur, notifier nest
     await axios.post(
       'http://localhost:3000/webhooks/cv-validation',
       {
